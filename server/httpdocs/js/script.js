@@ -221,4 +221,60 @@
       throw new Error(`Failed to calculate luminance: ${error.message}`);
     }
   }
+
+  // sets up event listeners for copy button and invert checkbox
+  document.getElementById("copyButton").addEventListener("click", copyAsciiArt);
+  document
+    .getElementById("invertColors")
+    .addEventListener("change", toggleInvertColors);
+
+  // function to copy ASCII art to clipboard
+  function copyAsciiArt() {
+    try {
+      const asciiArt = document.getElementById("asciiArt");
+      if (!asciiArt) {
+        throw new Error("ASCII art element not found");
+      }
+
+      // creates temp textarea to handle copying
+      const textarea = document.createElement("textarea");
+      textarea.value = asciiArt.textContent;
+      document.body.appendChild(textarea);
+      textarea.select();
+
+      // executes copy command
+      document.execCommand("copy");
+
+      // cleans up
+      document.body.removeChild(textarea);
+
+      // provides visual feedback (optional)
+      const copyButton = document.getElementById("copyButton");
+      const originalText = copyButton.textContent;
+      copyButton.textContent = "Copied!";
+      setTimeout(() => {
+        copyButton.textContent = originalText;
+      }, 2000);
+    } catch (error) {
+      handleError("Failed to copy ASCII art: " + error.message);
+    }
+  }
+
+  // function to toggle inverted colors
+  function toggleInvertColors(event) {
+    try {
+      const asciiArt = document.getElementById("asciiArt");
+      if (!asciiArt) {
+        throw new Error("ASCII art element not found");
+      }
+
+      if (event.target.checked) {
+        asciiArt.classList.add("inverted");
+      } else {
+        asciiArt.classList.remove("inverted");
+      }
+    } catch (error) {
+      handleError("Failed to toggle colors: " + error.message);
+    }
+  }
 })();

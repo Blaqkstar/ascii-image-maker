@@ -11,7 +11,7 @@ body {
   padding: 5px;
   border: 3px solid #9c9c9c79;
   border-radius: 8px;
-  box-shadow: 1px 5px 8px black;
+  box-shadow: 1px 5px 18px black;
 }
 #imageCanvas {
   display: none;
@@ -25,4 +25,35 @@ wrapper {
 }
 #errorMessage {
   font-size: 12pt;
+}
+.controls {
+  margin: 10px 0;
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+label {
+  font-size: 12pt;
+}
+#copyButton {
+  padding: 8px 16px;
+  background-color: #4a4a4a;
+  color: #e4e4e4;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+#copyButton:hover {
+  background-color: #5a5a5a;
+}
+
+.inverted {
+  background-color: #e4e4e4 !important;
+  color: #222222 !important;
+  border-color: #2b2b2b79 !important;
+}
+input[type="checkbox"] {
+  accent-color: #8d0f0f;
 }
