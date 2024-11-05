@@ -1,140 +1,191 @@
 (function () {
-  // adds event listener to handle image file uploads
   document
     .getElementById("imageInput")
     .addEventListener("change", handleImageUpload);
 
-  // main function to handle image upload and processing
   function handleImageUpload(event) {
-    // gets uploaded file from the input element
-    const file = event.target.files[0];
-    const reader = new FileReader();
+    try {
+      const file = event.target.files[0];
 
-    // sets up FileReader onload handler to process the image
-    reader.onload = function (event) {
-      const img = new Image();
+      if (!file) {
+        throw new Error("No file selected");
+      }
 
-      // sets up image onload handler to draw and convert the image
-      img.onload = function () {
-        // gets canvas and context for image processing
-        const canvas = document.getElementById("imageCanvas");
-        const ctx = canvas.getContext("2d");
+      if (!file.type.startsWith("image/")) {
+        throw new Error("Selected file must be an image");
+      }
 
-        // defines ASCII art parameters
-        const charAspectRatio = 0.7; //compensate for character height/width ratio
-        const horizontalSpacing = " "; // space between ASCII characters
+      const reader = new FileReader();
 
-        // calc target dimensions maintaining aspect ratio
-        const targetWidth = 400;
-        const targetHeight = Math.floor(
-          (targetWidth / img.width) * img.height * charAspectRatio
-        );
-
-        // sets canvas dimensions
-        canvas.width = targetWidth;
-        canvas.height = targetHeight;
-
-        // draw simage to canvas at specified dimensions
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-        // gets image data and converts to ASCII
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const ascii = convertToAscii(imageData, horizontalSpacing);
-        document.getElementById("asciiArt").textContent = ascii;
+      reader.onerror = function () {
+        handleError("Failed to read file");
       };
 
-      // sets image source to trigger loading
-      img.src = event.target.result;
-    };
+      reader.onload = function (event) {
+        const img = new Image();
 
-    // reads the uploaded file as data URL
-    reader.readAsDataURL(file);
+        img.onerror = function () {
+          handleError("Failed to load image");
+        };
+
+        img.onload = function () {
+          try {
+            const canvas = document.getElementById("imageCanvas");
+            if (!canvas) {
+              throw new Error("Canvas element not found");
+            }
+
+            const ctx = canvas.getContext("2d");
+            if (!ctx) {
+              throw new Error("Failed to get canvas context");
+            }
+
+            const charAspectRatio = 0.7;
+            const horizontalSpacing = " ";
+
+            // Calculate target dimensions based on orientation
+            let targetWidth, targetHeight;
+            if (img.width > img.height) {
+              targetWidth = 400;
+              targetHeight = Math.floor(
+                (targetWidth / img.width) * img.height * charAspectRatio
+              );
+            } else {
+              targetHeight = 200; // Can now handle larger heights
+              targetWidth = Math.floor(
+                (targetHeight / (img.height * charAspectRatio)) * img.width
+              );
+            }
+
+            canvas.width = targetWidth;
+            canvas.height = targetHeight;
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            const imageData = ctx.getImageData(
+              0,
+              0,
+              canvas.width,
+              canvas.height
+            );
+            const ascii = convertToAsciiOptimized(imageData, horizontalSpacing);
+
+            const asciiOutput = document.getElementById("asciiArt");
+            if (!asciiOutput) {
+              throw new Error("ASCII output element not found");
+            }
+            asciiOutput.textContent = ascii;
+
+            clearError();
+          } catch (error) {
+            handleError(error.message);
+          }
+        };
+
+        img.src = event.target.result;
+      };
+
+      reader.readAsDataURL(file);
+    } catch (error) {
+      handleError(error.message);
+    }
   }
 
-  // main function to convert image data to ASCII art
-  function convertToAscii(imageData, horizontalSpacing) {
-    // defines ASCII characters from darkest to lightest
-    const grayChars =
-      '$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,"^`. ';
-    const { data, width, height } = imageData;
-
-    // calc luminance values for each pixel
-    const luminanceValues = [];
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const i = (y * width + x) * 4;
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        luminanceValues.push(getLuminance(r, g, b));
-      }
-    }
-
-    // normalizes contrast values for better visual output
-    const normalizedValues = normalizeContrast(luminanceValues);
-
-    // converts normalized values to ASCII characters
-    let ascii = "";
-    for (let y = 0; y < height; y++) {
-      let row = "";
-      for (let x = 0; x < width; x++) {
-        const index = y * width + x;
-        const normalizedBrightness = normalizedValues[index];
-
-        // maps brightness to character index with darker preference
-        const charIndex = Math.floor(
-          (1 - normalizedBrightness) * (grayChars.length - 1)
-        );
-        // applies darkness bias by adjusting character index
-        const adjustedIndex = Math.min(
-          charIndex + Math.floor(grayChars.length * 0.1),
-          grayChars.length - 1
-        );
-
-        row += grayChars[adjustedIndex] + horizontalSpacing;
-      }
-      ascii += row + "\n";
-    }
-
-    return ascii;
+  function handleError(message) {
+    console.error(message);
+    const errorDiv =
+      document.getElementById("errorMessage") || createErrorElement();
+    errorDiv.textContent = `Error: ${message}`;
+    errorDiv.style.display = "block";
   }
 
-  // calc perceived luminance using color science formulas
+  function clearError() {
+    const errorDiv = document.getElementById("errorMessage");
+    if (errorDiv) {
+      errorDiv.style.display = "none";
+    }
+  }
+
+  function createErrorElement() {
+    const errorDiv = document.createElement("div");
+    errorDiv.id = "errorMessage";
+    errorDiv.style.color = "red";
+    errorDiv.style.marginTop = "10px";
+    document.getElementById("imageInput").parentNode.appendChild(errorDiv);
+    return errorDiv;
+  }
+
+  function convertToAsciiOptimized(imageData, horizontalSpacing) {
+    try {
+      const grayChars =
+        '$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,"^`. ';
+      const { data, width, height } = imageData;
+
+      // Find min/max luminance in a single pass
+      let minLuminance = Infinity;
+      let maxLuminance = -Infinity;
+
+      // Process the image in chunks to avoid stack overflow
+      const chunkSize = 10000; // Process 10000 pixels at a time
+      let ascii = "";
+
+      for (let y = 0; y < height; y++) {
+        let row = "";
+        for (let x = 0; x < width; x++) {
+          const i = (y * width + x) * 4;
+          const luminance = getLuminance(data[i], data[i + 1], data[i + 2]);
+          minLuminance = Math.min(minLuminance, luminance);
+          maxLuminance = Math.max(maxLuminance, luminance);
+        }
+      }
+
+      // Normalize and convert to ASCII in a single pass
+      for (let y = 0; y < height; y++) {
+        let row = "";
+        for (let x = 0; x < width; x++) {
+          const i = (y * width + x) * 4;
+          const luminance = getLuminance(data[i], data[i + 1], data[i + 2]);
+
+          // Inline normalization and contrast adjustment
+          let normalized =
+            (luminance - minLuminance) / (maxLuminance - minLuminance);
+          normalized = Math.pow(normalized, 1.8); // Darkness bias
+
+          // Calculate character index
+          const charIndex = Math.floor(
+            (1 - normalized) * (grayChars.length - 1)
+          );
+          const adjustedIndex = Math.min(
+            charIndex + Math.floor(grayChars.length * 0.1),
+            grayChars.length - 1
+          );
+
+          row += grayChars[adjustedIndex] + horizontalSpacing;
+        }
+        ascii += row + "\n";
+      }
+
+      return ascii;
+    } catch (error) {
+      throw new Error(`Failed to convert image to ASCII: ${error.message}`);
+    }
+  }
+
   function getLuminance(r, g, b) {
-    // converts RGB values to sRGB color space (0-1 range)
-    const rsRGB = r / 255;
-    const gsRGB = g / 255;
-    const bsRGB = b / 255;
+    try {
+      // Simplified luminance calculation to reduce operations
+      const rsRGB = r / 255;
+      const gsRGB = g / 255;
+      const bsRGB = b / 255;
 
-    // converts to linear RGB with gamma adjustment for darker output
-    const gamma = 1.6; // Adjustable gamma value for darkness control
-    const rLinear =
-      rsRGB <= 0.03928
-        ? rsRGB / 12.92
-        : Math.pow((rsRGB + 0.055) / 1.055, gamma);
-    const gLinear =
-      gsRGB <= 0.03928
-        ? gsRGB / 12.92
-        : Math.pow((gsRGB + 0.055) / 1.055, gamma);
-    const bLinear =
-      bsRGB <= 0.03928
-        ? bsRGB / 12.92
-        : Math.pow((bsRGB + 0.055) / 1.055, gamma);
+      // Simplified gamma correction
+      const gamma = 1.6;
+      const rLinear = Math.pow(rsRGB, gamma);
+      const gLinear = Math.pow(gsRGB, gamma);
+      const bLinear = Math.pow(bsRGB, gamma);
 
-    // calcfinal luminance using standard perception weights
-    return 0.2126 * rLinear + 0.7152 * gLinear + 0.0722 * bLinear;
-  }
-
-  // normalizes contrast values with darkness bias
-  function normalizeContrast(values) {
-    // finds value range
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    return values.map((v) => {
-      // normalizes to 0-1 range
-      const normalized = (v - min) / (max - min);
-      // applies power function for darkness bias (higher power = darker output)
-      return Math.pow(normalized, 1.8); // adjustable darkness control
-    });
+      return 0.2126 * rLinear + 0.7152 * gLinear + 0.0722 * bLinear;
+    } catch (error) {
+      throw new Error(`Failed to calculate luminance: ${error.message}`);
+    }
   }
 })();
