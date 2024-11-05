@@ -151,7 +151,7 @@
           }
 
           // applies dynamic contrast adjustment
-          const contrastFactor = 1 + stats.stdDev * 2;
+          const contrastFactor = 1 + stats.stdDev * 4;
           normalized = Math.pow(normalized, contrastFactor);
 
           // selects appropriate ascii character based on normalized value
@@ -178,7 +178,7 @@
       const bsRGB = b / 255;
 
       // applies gamma correction with linear portion handling
-      const gamma = 2.2; // uses standard sRGB gamma value
+      const gamma = 2.2; // controller - default value is 2.2
       const rLinear =
         rsRGB <= 0.03928
           ? rsRGB / 12.92
