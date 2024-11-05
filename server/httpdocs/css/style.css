@@ -11,7 +11,7 @@ body {
   padding: 5px;
   border: 3px solid #9c9c9c79;
   border-radius: 8px;
-  box-shadow: 1px 5px 18px black;
+  box-shadow: 1px 5px 18px #00000080;
 }
 #imageCanvas {
   display: none;
@@ -44,11 +44,10 @@ label {
   cursor: pointer;
   font-family: inherit;
 }
-
 #copyButton:hover {
   background-color: #5a5a5a;
+  box-shadow: 1px 3px 10px #00000080;
 }
-
 .inverted {
   background-color: #e4e4e4 !important;
   color: #222222 !important;

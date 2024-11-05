@@ -1,64 +1,34 @@
-// creates self-executing function to avoid global scope pollution
 (function () {
-  // adds event listener for image upload changes
+  // Previous event listeners and helper functions remain the same
   document
     .getElementById("imageInput")
     .addEventListener("change", handleImageUpload);
 
-  // handles the image upload process and converts to ascii
   function handleImageUpload(event) {
+    // ... (same as before until the convertToAsciiOptimized call)
     try {
-      // gets selected file from input
       const file = event.target.files[0];
-
-      // validates file existence
-      if (!file) {
-        throw new Error("No file selected");
-      }
-
-      // checks if selected file is an image
+      if (!file) throw new Error("No file selected");
       if (!file.type.startsWith("image/")) {
         throw new Error("Selected file must be an image");
       }
 
-      // creates file reader instance
       const reader = new FileReader();
-
-      // handles file reading errors
-      reader.onerror = function () {
-        handleError("Failed to read file");
-      };
-
-      // processes file after successful load
+      reader.onerror = () => handleError("Failed to read file");
       reader.onload = function (event) {
-        // creates new image object
         const img = new Image();
-
-        // handles image loading errors
-        img.onerror = function () {
-          handleError("Failed to load image");
-        };
-
-        // processes image after successful load
+        img.onerror = () => handleError("Failed to load image");
         img.onload = function () {
           try {
-            // gets canvas element for image processing
             const canvas = document.getElementById("imageCanvas");
-            if (!canvas) {
-              throw new Error("Canvas element not found");
-            }
+            if (!canvas) throw new Error("Canvas element not found");
 
-            // gets canvas context for drawing
             const ctx = canvas.getContext("2d");
-            if (!ctx) {
-              throw new Error("Failed to get canvas context");
-            }
+            if (!ctx) throw new Error("Failed to get canvas context");
 
-            // defines character display properties
             const charAspectRatio = 0.7;
             const horizontalSpacing = " ";
 
-            // calculates target dimensions based on image orientation
             let targetWidth, targetHeight;
             if (img.width > img.height) {
               targetWidth = 400;
@@ -66,131 +36,116 @@
                 (targetWidth / img.width) * img.height * charAspectRatio
               );
             } else {
-              targetHeight = 200; // handles larger heights
+              targetHeight = 200;
               targetWidth = Math.floor(
                 (targetHeight / (img.height * charAspectRatio)) * img.width
               );
             }
 
-            // sets canvas dimensions
             canvas.width = targetWidth;
             canvas.height = targetHeight;
-
-            // draws image on canvas
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-            // gets image data for processing
             const imageData = ctx.getImageData(
               0,
               0,
               canvas.width,
               canvas.height
             );
-
-            // converts image data to ascii art
             const ascii = convertToAsciiOptimized(imageData, horizontalSpacing);
 
-            // displays ascii art output
             const asciiOutput = document.getElementById("asciiArt");
-            if (!asciiOutput) {
-              throw new Error("ASCII output element not found");
-            }
-            asciiOutput.textContent = ascii;
+            if (!asciiOutput) throw new Error("ASCII output element not found");
 
-            // clears any existing errors
+            asciiOutput.textContent = ascii;
             clearError();
           } catch (error) {
             handleError(error.message);
           }
         };
-
-        // sets image source to trigger loading
         img.src = event.target.result;
       };
-
-      // starts reading the file
       reader.readAsDataURL(file);
     } catch (error) {
       handleError(error.message);
     }
   }
 
-  // handles error display
-  function handleError(message) {
-    console.error(message);
-    const errorDiv =
-      document.getElementById("errorMessage") || createErrorElement();
-    errorDiv.textContent = `Error: ${message}`;
-    errorDiv.style.display = "block";
-  }
+  // Enhanced image analysis and conversion functions
+  function analyzeLuminanceStats(imageData) {
+    const { data, width, height } = imageData;
+    let sum = 0;
+    let min = Infinity;
+    let max = -Infinity;
+    let values = [];
 
-  // clears error messages
-  function clearError() {
-    const errorDiv = document.getElementById("errorMessage");
-    if (errorDiv) {
-      errorDiv.style.display = "none";
+    // Calculate luminance for each pixel and gather statistics
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 4;
+        const luminance = getLuminance(data[i], data[i + 1], data[i + 2]);
+        values.push(luminance);
+        sum += luminance;
+        min = Math.min(min, luminance);
+        max = Math.max(max, luminance);
+      }
     }
+
+    // Calculate mean and standard deviation
+    const mean = sum / (width * height);
+    const variance =
+      values.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) /
+      values.length;
+    const stdDev = Math.sqrt(variance);
+
+    return {
+      min,
+      max,
+      mean,
+      stdDev,
+    };
   }
 
-  // creates error element if it doesn't exist
-  function createErrorElement() {
-    const errorDiv = document.createElement("div");
-    errorDiv.id = "errorMessage";
-    errorDiv.style.color = "red";
-    errorDiv.style.marginTop = "10px";
-    document.getElementById("imageInput").parentNode.appendChild(errorDiv);
-    return errorDiv;
-  }
-
-  // converts image data to ascii art using optimization
   function convertToAsciiOptimized(imageData, horizontalSpacing) {
     try {
-      // defines characters for ascii representation
       const grayChars =
         '$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,"^`. ';
       const { data, width, height } = imageData;
 
-      // initializes luminance range values
-      let minLuminance = Infinity;
-      let maxLuminance = -Infinity;
-
-      // sets chunk processing size to prevent stack overflow
-      const chunkSize = 10000; // processes 10000 pixels at a time
+      // Get statistical information about the image
+      const stats = analyzeLuminanceStats(imageData);
       let ascii = "";
 
-      // finds luminance range
-      for (let y = 0; y < height; y++) {
-        let row = "";
-        for (let x = 0; x < width; x++) {
-          const i = (y * width + x) * 4;
-          const luminance = getLuminance(data[i], data[i + 1], data[i + 2]);
-          minLuminance = Math.min(minLuminance, luminance);
-          maxLuminance = Math.max(maxLuminance, luminance);
-        }
-      }
+      // Define dynamic range thresholds based on statistics
+      const lowerBound = Math.max(stats.mean - 2 * stats.stdDev, stats.min);
+      const upperBound = Math.min(stats.mean + 2 * stats.stdDev, stats.max);
 
-      // converts pixels to ascii characters
+      // Convert pixels to ASCII with adaptive range
       for (let y = 0; y < height; y++) {
         let row = "";
         for (let x = 0; x < width; x++) {
           const i = (y * width + x) * 4;
           const luminance = getLuminance(data[i], data[i + 1], data[i + 2]);
 
-          // normalizes and adjusts contrast
-          let normalized =
-            (luminance - minLuminance) / (maxLuminance - minLuminance);
-          normalized = Math.pow(normalized, 1.8); // applies darkness bias
+          // Normalize luminance based on adaptive range
+          let normalized;
+          if (luminance <= lowerBound) {
+            normalized = 0;
+          } else if (luminance >= upperBound) {
+            normalized = 1;
+          } else {
+            normalized = (luminance - lowerBound) / (upperBound - lowerBound);
+          }
 
-          // selects appropriate ascii character
+          // Apply contrast adjustment based on image statistics
+          const contrastFactor = 1 + stats.stdDev * 2;
+          normalized = Math.pow(normalized, contrastFactor);
+
+          // Select character with dynamic range consideration
           const charIndex = Math.floor(
             (1 - normalized) * (grayChars.length - 1)
           );
-          const adjustedIndex = Math.min(
-            charIndex + Math.floor(grayChars.length * 0.1),
-            grayChars.length - 1
-          );
-
-          row += grayChars[adjustedIndex] + horizontalSpacing;
+          row += grayChars[charIndex] + horizontalSpacing;
         }
         ascii += row + "\n";
       }
@@ -201,54 +156,78 @@
     }
   }
 
-  // calculates luminance value from rgb components
   function getLuminance(r, g, b) {
     try {
-      // converts rgb to srgb space
+      // Convert to sRGB space with improved gamma handling
       const rsRGB = r / 255;
       const gsRGB = g / 255;
       const bsRGB = b / 255;
 
-      // applies gamma correction
-      const gamma = 1.6;
-      const rLinear = Math.pow(rsRGB, gamma);
-      const gLinear = Math.pow(gsRGB, gamma);
-      const bLinear = Math.pow(bsRGB, gamma);
+      // Apply more precise gamma correction
+      const gamma = 2.2; // Standard sRGB gamma
+      const rLinear =
+        rsRGB <= 0.03928
+          ? rsRGB / 12.92
+          : Math.pow((rsRGB + 0.055) / 1.055, gamma);
+      const gLinear =
+        gsRGB <= 0.03928
+          ? gsRGB / 12.92
+          : Math.pow((gsRGB + 0.055) / 1.055, gamma);
+      const bLinear =
+        bsRGB <= 0.03928
+          ? bsRGB / 12.92
+          : Math.pow((bsRGB + 0.055) / 1.055, gamma);
 
-      // returns weighted luminance value
+      // Use standard relative luminance weights
       return 0.2126 * rLinear + 0.7152 * gLinear + 0.0722 * bLinear;
     } catch (error) {
       throw new Error(`Failed to calculate luminance: ${error.message}`);
     }
   }
 
-  // sets up event listeners for copy button and invert checkbox
+  // Keep existing error handling and UI functions
+  function handleError(message) {
+    console.error(message);
+    const errorDiv =
+      document.getElementById("errorMessage") || createErrorElement();
+    errorDiv.textContent = `Error: ${message}`;
+    errorDiv.style.display = "block";
+  }
+
+  function clearError() {
+    const errorDiv = document.getElementById("errorMessage");
+    if (errorDiv) {
+      errorDiv.style.display = "none";
+    }
+  }
+
+  function createErrorElement() {
+    const errorDiv = document.createElement("div");
+    errorDiv.id = "errorMessage";
+    errorDiv.style.color = "red";
+    errorDiv.style.marginTop = "10px";
+    document.getElementById("imageInput").parentNode.appendChild(errorDiv);
+    return errorDiv;
+  }
+
+  // Keep existing copy and invert color functions
   document.getElementById("copyButton").addEventListener("click", copyAsciiArt);
   document
     .getElementById("invertColors")
     .addEventListener("change", toggleInvertColors);
 
-  // function to copy ASCII art to clipboard
   function copyAsciiArt() {
     try {
       const asciiArt = document.getElementById("asciiArt");
-      if (!asciiArt) {
-        throw new Error("ASCII art element not found");
-      }
+      if (!asciiArt) throw new Error("ASCII art element not found");
 
-      // creates temp textarea to handle copying
       const textarea = document.createElement("textarea");
       textarea.value = asciiArt.textContent;
       document.body.appendChild(textarea);
       textarea.select();
-
-      // executes copy command
       document.execCommand("copy");
-
-      // cleans up
       document.body.removeChild(textarea);
 
-      // provides visual feedback (optional)
       const copyButton = document.getElementById("copyButton");
       const originalText = copyButton.textContent;
       copyButton.textContent = "Copied!";
@@ -260,13 +239,10 @@
     }
   }
 
-  // function to toggle inverted colors
   function toggleInvertColors(event) {
     try {
       const asciiArt = document.getElementById("asciiArt");
-      if (!asciiArt) {
-        throw new Error("ASCII art element not found");
-      }
+      if (!asciiArt) throw new Error("ASCII art element not found");
 
       if (event.target.checked) {
         asciiArt.classList.add("inverted");
